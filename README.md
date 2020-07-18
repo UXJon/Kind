@@ -28,3 +28,4 @@ var styles:[Kind<DragHandle>: HandleStyle] = //...
 let style:HandleStyle = kind.value(in: styles)
 ```
 
+Only the Kind's id is considered in equality, the fallback is not considered. Two kinds with identical ids, but different fallbacks are considered equal.
