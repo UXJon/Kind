@@ -27,8 +27,8 @@ public enum Kind<T>:Hashable,ExpressibleByStringLiteral {
     }
     
     ///Initializes with an ordered list of fallback ids (fails if the list is empty)
-    public init?<S:Sequence>(hierarchy:S) where S.Element == String {
-        guard let id = hierarchy.first {return nil}
+    public init?<C:Collection>(hierarchy:C) where C.Element == String {
+        guard let id = hierarchy.first else {return nil}
         if let fallback = Kind<T>(hierarchy: hierarchy.dropFirst()) {
             self = .fallback(id, fallback)
         }else{
