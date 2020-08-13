@@ -12,8 +12,28 @@ public enum Kind<T>:Hashable,ExpressibleByStringLiteral {
         self = .fallback(id, fallback)
     }
     
+    ///Initialize with a kind id (and no fallback)
     public init(_ id:String) {
         self = .id(id)
+    }
+    
+    ///Initialize with a kind id, and an optional fallback
+    public init(_ id:String, fallback:Kind<T>?) {
+        if let fallback = fallback {
+            self = .fallback(id, fallback)
+        }else{
+            self = .id(id)
+        }
+    }
+    
+    ///Initializes with an ordered list of fallback ids (fails if the list is empty)
+    public init?<S:Sequence>(hierarchy:S) where S.Element == String {
+        guard let id = hierarchy.first {return nil}
+        if let fallback = Kind<T>(hierarchy: hierarchy.dropFirst()) {
+            self = .fallback(id, fallback)
+        }else{
+            self = .id(id)
+        }
     }
     
     ///Initialize with a path that separates fallbacks using a given separator character (e.g. "upperLeftRect/rectCorner/rect/dragHandle")
@@ -57,6 +77,55 @@ public enum Kind<T>:Hashable,ExpressibleByStringLiteral {
         case .fallback(_, let fallback): return fallback
         case .id(_): return nil
         }
+    }
+    
+    ///Finds the most specific common id/fallback shared with another kind, if it exists
+    public func commonKind(with other:Kind<T>)->Kind<T>? {
+        ///Check for a perfect match first
+        if self.id == other.id {return self}
+        
+        ///Then run through each of our fallbacks to see if they match the other kind
+        let ids = fallback?.hierarchy ?? []
+        guard let idx = other.indexOfBestMatch(in: ids) else {
+            return nil
+        }
+        return Kind(hierarchy: ids[idx...])
+    }
+    
+    ///Returns whether the id or fallbacks match a given id
+    public func matches(id idToMatch: String)->Bool {
+        switch self {
+        case .id(let id): return id == idToMatch
+        case .fallback(let id, let fallback):
+            return id == idToMatch || fallback.matches(id: idToMatch)
+        }
+    }
+    
+    ///Returns whether the id or fallbacks match the top-level id of a given kind. In other words, checks whether we are equal to or more specific than another kind.
+    public func matches(_ kind:Kind<T>)->Bool {
+        self.matches(id: kind.id)
+    }
+    
+    ///Returns the index of the match from a list of ids requiring the least fallback, if any exists. If two ids require the same fallback level, then the first will be returned
+    public func indexOfBestMatch(in ids:[String])->Int? {
+        ///If the array is empty, then there can be no match
+        guard !ids.isEmpty else {return nil}
+        ///Start by looking for a perfect match
+        if let idx = ids.firstIndex(of: self.id) {
+            return idx
+        }
+        ///Then check our fallback for a match
+        return fallback?.indexOfBestMatch(in: ids)
+    }
+    
+    ///Returns the index of the match to the top-level ids from a list of kinds requiring the least fallback, if any exists. If two ids require the same fallback level, then the first will be returned
+    public func indexOfBestMatch(in kinds:[Kind<T>])->Int? {
+        return indexOfBestMatch(in: kinds.map({$0.id}))
+    }
+    
+    public func bestMatch(in kinds:[Kind<T>])->Kind<T>? {
+        guard let idx = indexOfBestMatch(in: kinds) else {return nil}
+        return kinds[idx]
     }
     
     ///Finds the most specific value in the given dictionary using this kind as the key. It looks for the id in the given dictionary, then tries fallback ids if a value isn't found.
