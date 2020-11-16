@@ -1,7 +1,7 @@
 import Foundation
 
 ///A Kind<T> gives a quick and simple way to extensibly express a cascading kind that is only associated with a particular type T.  This allows Kind<T>s to be defined in extensions for use with dot-syntax.  For example, a drag handle might be an `.upperLeftRect`, which is also a `.rectCorner` drag handle, which is also a `.rect` drag handle, and finally just a `.dragHandle`.  This allows you to define something (e.g. a style) at various levels of specificity, and then use the most specific kind which is available
-public enum Kind<T>:Hashable,ExpressibleByStringLiteral {
+public enum Kind<T>:Hashable,ExpressibleByStringLiteral,Codable {
     ///A kind without a fallback
     case id(String)
     ///Defines a kind and a fallback
@@ -49,6 +49,32 @@ public enum Kind<T>:Hashable,ExpressibleByStringLiteral {
     
     public init(stringLiteral value: StringLiteralType) {
         self = .id(value)
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let id = try container.decode(String.self, forKey: .id)
+        if let fallback = try container.decodeIfPresent(Kind<T>.self, forKey: .fallback) {
+            self = .fallback(id, fallback)
+        }else{
+            self = .id(id)
+        }
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .id(let id):
+            try container.encode(id, forKey: .id)
+        case .fallback(let id, let fallback):
+            try container.encode(id, forKey: .id)
+            try container.encode(fallback, forKey: .fallback)
+        }
+    }
+    
+    enum CodingKeys:CodingKey {
+        case id
+        case fallback
     }
     
     ///The top-level id for this kind
@@ -162,7 +188,7 @@ extension Kind:CustomDebugStringConvertible {
     }
 }
 
-extension Dictionary where Key == String {
+public extension Dictionary where Key == String {
     subscript<T>(_ kind:Kind<T>)->Value? {
         get{
             if let value = self[kind.id] {
